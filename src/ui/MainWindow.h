@@ -8,6 +8,7 @@
 #include "ui/ChannelList.h"
 #include "ui/ChatView.h"
 #include "ui/InputBar.h"
+#include "ui/MessageWidget.h"
 #include "ui/ActiveUsersPanel.h"
 
 class QLabel;

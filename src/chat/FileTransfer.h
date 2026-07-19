@@ -22,6 +22,8 @@ public:
 
     void startSend(const QString& filePath);
     void cancelSend();
+    QString sendFileId() const { return m_sendFileId; }
+    QString sendFileName() const { return m_sendFileName; }
     void acceptReceive(const QString& fileId);
     void rejectReceive(const QString& fileId);
     void processIncomingFrame(const QString& info, const QString& fromCallsign);
@@ -59,7 +61,7 @@ private:
     static constexpr int MAX_OFFER_RETRIES = 6; // 30s total
     static constexpr int BURST_GAP_MS = 1500;
     static constexpr int MISSING_TIMEOUT_MS = 12000;
-    static constexpr int MAX_GAP_ROUNDS = 3;
+    static constexpr int MAX_GAP_ROUNDS = 8;
 
     QTimer* m_burstTimer = nullptr;
     QTimer* m_offerTimer = nullptr;
@@ -79,7 +81,7 @@ private:
     };
     QMap<QString, RxState> m_receivers;
     static constexpr int RX_SILENCE_MS = 8000;
-    static constexpr int RX_MAX_GAP_ROUNDS = 3;
+    static constexpr int RX_MAX_GAP_ROUNDS = 8;
 
     // -- Helpers --
     static QString makeFileId(const QString& filePath);

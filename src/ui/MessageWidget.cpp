@@ -143,3 +143,37 @@ QString MessageWidget::avatarColor(const QString& callsign)
     uint hash = qHash(callsign.toUpper());
     return s_discordColors[hash % s_discordColors.size()];
 }
+
+void MessageWidget::updateFileProgress(int received, int total)
+{
+    if (m_progressBar) {
+        m_progressBar->setMaximum(total);
+        m_progressBar->setValue(received);
+    }
+    if (m_textLabel) {
+        m_textLabel->setText(QString("%1 / %2 chunks").arg(received).arg(total));
+    }
+}
+
+void MessageWidget::updateFileComplete(qint64 fileSize)
+{
+    if (m_progressBar) {
+        m_progressBar->setValue(m_progressBar->maximum());
+    }
+    if (m_textLabel) {
+        if (fileSize > 0)
+            m_textLabel->setText(QString("\xE2\x9C\x85 Complete \xE2\x80\xA2 %1 KB")
+                                     .arg(fileSize / 1024));
+        else
+            m_textLabel->setText("\xE2\x9C\x85 Complete");
+        m_textLabel->setStyleSheet("color: #57f287; font-size: 12px; background: transparent;");
+    }
+}
+
+void MessageWidget::updateFileFailed()
+{
+    if (m_textLabel) {
+        m_textLabel->setText("\xE2\x9D\x8C Transfer failed");
+        m_textLabel->setStyleSheet("color: #ed4245; font-size: 12px; background: transparent;");
+    }
+}

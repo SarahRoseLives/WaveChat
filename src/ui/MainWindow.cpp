@@ -57,9 +57,12 @@ MainWindow::MainWindow(QWidget* parent)
             this, &MainWindow::onFileComplete);
     connect(m_ftManager, &FileTransferManager::fileSendComplete,
             this, [this](const QString& fileId) {
-        Q_UNUSED(fileId);
         if (m_sendDialog)
             m_sendDialog->setComplete("");
+
+        auto it = m_fileWidgets.find(fileId);
+        if (it != m_fileWidgets.end() && it.value())
+            it.value()->updateFileComplete(0);
     });
     connect(m_ftManager, &FileTransferManager::fileFailed,
             this, &MainWindow::onFileFailed);
@@ -320,6 +323,28 @@ void MainWindow::onFileAttachRequested(const QString& filePath)
 
         m_sendDialog->show();
         m_ftManager->startSend(filePath);
+
+        // Show inline chat message for sender
+        FileTransferInfo fiSend;
+        fiSend.fileId = m_ftManager->sendFileId();
+        fiSend.fileName = fi.fileName();
+        fiSend.fileSize = fi.size();
+        fiSend.totalChunks = chunks;
+        fiSend.state = FileTransferInfo::Offering;
+        Message msg;
+        msg.callsign = m_controller->callsign();
+        msg.type = Message::File;
+        msg.file = fiSend;
+        msg.timestamp = QDateTime::currentDateTime();
+
+        QString channel = m_controller->currentChannel();
+        ensureChannelExists(channel);
+        m_channelMessages[channel].append(msg);
+        m_channelList->touchChannel(channel);
+
+        if (channel == m_controller->currentChannel()) {
+            m_fileWidgets[fiSend.fileId] = m_chatView->appendMessageEx(msg);
+        }
     });
 
     connect(dlg, &FileTransferDialog::cancelled, dlg, &QObject::deleteLater);
@@ -348,7 +373,7 @@ void MainWindow::onFileOfferReceived(const FileTransferInfo& info)
 
     dlg->show();
 
-    // Also show in chat
+    // Show in chat with progress tracking
     FileTransferInfo fiCopy = info;
     fiCopy.state = FileTransferInfo::Offering;
     Message msg;
@@ -356,20 +381,41 @@ void MainWindow::onFileOfferReceived(const FileTransferInfo& info)
     msg.type = Message::File;
     msg.file = fiCopy;
     msg.timestamp = QDateTime::currentDateTime();
-    onMessageReceived(msg);
+
+    QString channel = "main";
+    ensureChannelExists(channel);
+    m_channelMessages[channel].append(msg);
+    m_channelList->touchChannel(channel);
+
+    MessageWidget* w = nullptr;
+    if (channel == m_controller->currentChannel()) {
+        w = m_chatView->appendMessageEx(msg);
+    }
+    if (!msg.callsign.isEmpty())
+        m_activeUsers->addUser(msg.callsign);
+
+    m_fileWidgets[info.fileId] = w;
 }
 
 void MainWindow::onFileProgressUpdate(const QString& fileId, int done, int total)
 {
-    Q_UNUSED(fileId);
     if (m_recvDialog)
         m_recvDialog->setProgress(done, total);
+
+    auto it = m_fileWidgets.find(fileId);
+    if (it != m_fileWidgets.end() && it.value())
+        it.value()->updateFileProgress(done, total);
 }
 
 void MainWindow::onFileSendProgress(int done, int total)
 {
     if (m_sendDialog)
         m_sendDialog->setProgress(done, total);
+
+    // Update sender's inline chat widget
+    auto it = m_fileWidgets.find(m_ftManager->sendFileId());
+    if (it != m_fileWidgets.end() && it.value())
+        it.value()->updateFileProgress(done, total);
 }
 
 void MainWindow::onFileComplete(const FileTransferInfo& info)
@@ -381,13 +427,20 @@ void MainWindow::onFileComplete(const FileTransferInfo& info)
                 QFileInfo(info.savePath).absolutePath()));
         });
     }
+
+    auto it = m_fileWidgets.find(info.fileId);
+    if (it != m_fileWidgets.end() && it.value())
+        it.value()->updateFileComplete(info.fileSize);
 }
 
 void MainWindow::onFileFailed(const QString& fileId, const QString& reason)
 {
-    Q_UNUSED(fileId);
     statusBar()->showMessage(QString("File transfer: %1").arg(reason), 5000);
     m_chatView->appendMessage(Message::systemMessage("File transfer: " + reason));
+
+    auto it = m_fileWidgets.find(fileId);
+    if (it != m_fileWidgets.end() && it.value())
+        it.value()->updateFileFailed();
 }
 
 // ============================================================================

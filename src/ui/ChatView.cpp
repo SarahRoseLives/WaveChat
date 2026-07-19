@@ -41,13 +41,20 @@ ChatView::ChatView(QWidget* parent)
 
 void ChatView::appendMessage(const Message& msg)
 {
+    appendMessageEx(msg);
+}
+
+MessageWidget* ChatView::appendMessageEx(const Message& msg)
+{
     if (m_layout->count() > 0) {
         QLayoutItem* item = m_layout->takeAt(m_layout->count() - 1);
         delete item;
     }
 
-    m_layout->addWidget(new MessageWidget(msg, m_contents));
+    auto* widget = new MessageWidget(msg, m_contents);
+    m_layout->addWidget(widget);
     m_layout->addStretch();
+    return widget;
 }
 
 void ChatView::clearMessages()

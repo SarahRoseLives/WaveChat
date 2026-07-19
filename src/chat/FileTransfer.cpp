@@ -536,6 +536,26 @@ void FileTransferManager::processIncomingFrame(const QString& info, const QStrin
     }
 
     // ========================================================================
+    // Sender side: !cancel → receiver declined or cancelled
+    // ========================================================================
+    if (cmd == "!cancel" && parts.size() >= 2) {
+        if (parts[1] == m_sendFileId && (m_sendState == Offering || m_sendState == Bursting
+                                          || m_sendState == AwaitingMissing
+                                          || m_sendState == GapFilling)) {
+            m_offerTimer->stop();
+            m_burstTimer->stop();
+            m_missingTimer->stop();
+            m_sendState = SendFailed;
+            ProtocolLogger::log("FT RX", "!cancel " + m_sendFileId);
+            ProtocolLogger::log("FT STATE", "SendFailed (cancelled by receiver)");
+            emit fileFailed(m_sendFileId, "Receiver cancelled the transfer.");
+            m_sendState = Idle;
+            m_sendData.clear();
+        }
+        return;
+    }
+
+    // ========================================================================
     // Sender side: !done  → transfer confirmed complete
     // ========================================================================
     if (cmd == "!done" && parts.size() >= 2) {

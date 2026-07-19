@@ -4,12 +4,15 @@
 #include <QWidget>
 #include "chat/Message.h"
 
+class MessageWidget;
+
 class ChatView : public QScrollArea {
     Q_OBJECT
 public:
     explicit ChatView(QWidget* parent = nullptr);
 
     void appendMessage(const Message& msg);
+    MessageWidget* appendMessageEx(const Message& msg);
     void clearMessages();
 
 private:
