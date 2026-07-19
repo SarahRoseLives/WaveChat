@@ -1,0 +1,107 @@
+#include "InputBar.h"
+#include <QHBoxLayout>
+#include <QVBoxLayout>
+#include <QKeyEvent>
+
+InputBar::InputBar(QWidget* parent)
+    : QWidget(parent)
+{
+    setObjectName("inputBar");
+
+    auto* outerLayout = new QVBoxLayout(this);
+    outerLayout->setContentsMargins(0, 0, 0, 0);
+    outerLayout->setSpacing(0);
+
+    auto* separator = new QWidget(this);
+    separator->setFixedHeight(1);
+    separator->setStyleSheet("background-color: #2f3136;");
+    outerLayout->addWidget(separator);
+
+    auto* rowLayout = new QHBoxLayout();
+    rowLayout->setContentsMargins(16, 12, 16, 16);
+    rowLayout->setSpacing(8);
+
+    m_attachButton = new QPushButton("+", this);
+    m_attachButton->setObjectName("attachButton");
+    m_attachButton->setFixedSize(36, 36);
+    m_attachButton->setToolTip("Attach file (coming soon)");
+    m_attachButton->setEnabled(false);
+    connect(m_attachButton, &QPushButton::clicked, this, &InputBar::onAttachClicked);
+
+    m_edit = new QTextEdit(this);
+    m_edit->setObjectName("messageEdit");
+    m_edit->setPlaceholderText("Message #channel");
+    m_edit->setAcceptRichText(false);
+    m_edit->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    m_edit->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_edit->setTabChangesFocus(false);
+    m_edit->installEventFilter(this);
+
+    m_sendButton = new QPushButton("Send", this);
+    m_sendButton->setObjectName("sendButton");
+    m_sendButton->setFixedHeight(44);
+    m_sendButton->setMinimumWidth(72);
+    m_sendButton->setEnabled(false);
+    connect(m_sendButton, &QPushButton::clicked, this, &InputBar::onSendClicked);
+
+    // Enable send button only when there's text
+    connect(m_edit, &QTextEdit::textChanged, this, [this]() {
+        bool hasText = !m_edit->toPlainText().trimmed().isEmpty();
+        m_sendButton->setEnabled(m_edit->isEnabled() && hasText);
+    });
+
+    rowLayout->addWidget(m_attachButton, 0, Qt::AlignBottom);
+    rowLayout->addWidget(m_edit, 1);
+    rowLayout->addWidget(m_sendButton, 0, Qt::AlignBottom);
+
+    outerLayout->addLayout(rowLayout);
+}
+
+void InputBar::setEnabled(bool enabled)
+{
+    m_edit->setEnabled(enabled);
+    bool hasText = !m_edit->toPlainText().trimmed().isEmpty();
+    m_sendButton->setEnabled(enabled && hasText);
+    if (!enabled)
+        m_edit->setPlaceholderText("Connect to a TNC to start chatting...");
+}
+
+void InputBar::setPlaceholder(const QString& text)
+{
+    m_edit->setPlaceholderText(text);
+}
+
+void InputBar::clear()
+{
+    m_edit->clear();
+}
+
+void InputBar::onSendClicked()
+{
+    QString text = m_edit->toPlainText().trimmed();
+    if (!text.isEmpty()) {
+        emit messageSubmitted(text);
+        clear();
+    }
+}
+
+void InputBar::onAttachClicked()
+{
+}
+
+bool InputBar::eventFilter(QObject* obj, QEvent* event)
+{
+    if (obj == m_edit && event->type() == QEvent::KeyPress) {
+        auto* keyEvent = static_cast<QKeyEvent*>(event);
+        if (keyEvent->key() == Qt::Key_Return
+            || keyEvent->key() == Qt::Key_Enter) {
+            if (keyEvent->modifiers() & Qt::ShiftModifier) {
+                return false;
+            } else {
+                onSendClicked();
+                return true;
+            }
+        }
+    }
+    return QWidget::eventFilter(obj, event);
+}
