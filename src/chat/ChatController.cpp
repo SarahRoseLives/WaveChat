@@ -1,5 +1,6 @@
 #include "ChatController.h"
 #include "tnc/KissFrame.h"
+#include "util/ProtocolLogger.h"
 #include <QDateTime>
 
 // ============================================================================
@@ -158,6 +159,8 @@ void ChatController::sendMessage(const QString& text)
     QByteArray frame = buildFrame(text.trimmed());
     m_tnc->sendFrame(frame);
 
+    ProtocolLogger::log("TX CHAT", QString("ch=%1 \"%2\"").arg(m_currentChannel, text.trimmed()));
+
     Message localEcho;
     localEcho.callsign = m_callsign;
     localEcho.text = text.trimmed();
@@ -165,6 +168,25 @@ void ChatController::sendMessage(const QString& text)
     localEcho.timestamp = QDateTime::currentDateTime();
     localEcho.type = Message::Text;
     emit messageReceived(localEcho);
+}
+
+void ChatController::sendRawMessage(const QString& text)
+{
+    if (!m_tnc || !m_tnc->isConnected() || text.isEmpty())
+        return;
+
+    // Send without #channel prefix — used for file transfer protocol frames
+    QByteArray ax25;
+    ax25.append(encodeAx25Address("CQ",      0, false));
+    ax25.append(encodeAx25Address(m_callsign, 0, true));
+    ax25.append(static_cast<char>(0x03));
+    ax25.append(static_cast<char>(0xF0));
+    ax25.append(text.toUtf8());
+
+    QByteArray frame = KissFrame::encode(KissFrame::CMD_DATA, ax25);
+    m_tnc->sendFrame(frame);
+
+    ProtocolLogger::log("TX RAW", text.left(100));
 }
 
 void ChatController::onFrameReceived(const QByteArray& wireFrame)
@@ -177,7 +199,16 @@ void ChatController::onFrameReceived(const QByteArray& wireFrame)
     if (callsign.isEmpty())
         return;
 
+    // Protocol frames (file transfer) — route separately
+    if (info.startsWith('!')) {
+        ProtocolLogger::log("RX RAW", QString("from=%1 %2").arg(callsign, info.left(120)));
+        emit rawFrameReceived(info.toUtf8(), callsign);
+        return;
+    }
+
     auto [channel, text] = parseChannelFromText(info);
+
+    ProtocolLogger::log("RX CHAT", QString("from=%1 ch=%2 \"%3\"").arg(callsign, channel, text));
 
     Message msg;
     msg.callsign = callsign;

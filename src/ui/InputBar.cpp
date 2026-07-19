@@ -6,6 +6,7 @@
 #include <QTextCursor>
 #include <QApplication>
 #include <QScreen>
+#include <QFileDialog>
 
 InputBar::InputBar(QWidget* parent)
     : QWidget(parent)
@@ -23,7 +24,13 @@ InputBar::InputBar(QWidget* parent)
 
     auto* rowLayout = new QHBoxLayout();
     rowLayout->setContentsMargins(16, 12, 16, 16);
-    rowLayout->setSpacing(8);
+    rowLayout->setSpacing(6);
+
+    m_attachButton = new QPushButton("\xF0\x9F\x93\x8E", this);
+    m_attachButton->setObjectName("attachButton");
+    m_attachButton->setFixedSize(36, 36);
+    m_attachButton->setToolTip("Attach a file");
+    m_attachButton->setCursor(Qt::PointingHandCursor);
 
     m_emojiButton = new QPushButton("\xF0\x9F\x98\x8A", this);
     m_emojiButton->setObjectName("emojiButton");
@@ -47,6 +54,7 @@ InputBar::InputBar(QWidget* parent)
     m_sendButton->setMinimumWidth(72);
     m_sendButton->setEnabled(false);
 
+    connect(m_attachButton, &QPushButton::clicked, this, &InputBar::onAttachClicked);
     connect(m_emojiButton, &QPushButton::clicked, this, &InputBar::onEmojiClicked);
     connect(m_sendButton, &QPushButton::clicked, this, &InputBar::onSendClicked);
 
@@ -55,6 +63,7 @@ InputBar::InputBar(QWidget* parent)
         m_sendButton->setEnabled(m_edit->isEnabled() && hasText);
     });
 
+    rowLayout->addWidget(m_attachButton, 0, Qt::AlignBottom);
     rowLayout->addWidget(m_emojiButton, 0, Qt::AlignBottom);
     rowLayout->addWidget(m_edit, 1);
     rowLayout->addWidget(m_sendButton, 0, Qt::AlignBottom);
@@ -68,6 +77,7 @@ void InputBar::setEnabled(bool enabled)
     bool hasText = !m_edit->toPlainText().trimmed().isEmpty();
     m_sendButton->setEnabled(enabled && hasText);
     m_emojiButton->setEnabled(enabled);
+    m_attachButton->setEnabled(enabled);
     if (!enabled)
         m_edit->setPlaceholderText("Connect to a TNC to start chatting...");
 }
@@ -91,6 +101,13 @@ void InputBar::onSendClicked()
     }
 }
 
+void InputBar::onAttachClicked()
+{
+    QString path = QFileDialog::getOpenFileName(this, "Select file to send");
+    if (!path.isEmpty())
+        emit fileAttachRequested(path);
+}
+
 void InputBar::onEmojiClicked()
 {
     if (!m_emojiPicker) {
@@ -99,12 +116,9 @@ void InputBar::onEmojiClicked()
                 this, &InputBar::onEmojiSelected);
     }
 
-    // Position the picker above the emoji button
     QPoint btnPos = m_emojiButton->mapToGlobal(QPoint(0, 0));
     int x = btnPos.x();
     int y = btnPos.y() - m_emojiPicker->height() - 4;
-
-    // Keep it on-screen
     if (y < 0) y = btnPos.y() + m_emojiButton->height() + 4;
 
     m_emojiPicker->move(x, y);

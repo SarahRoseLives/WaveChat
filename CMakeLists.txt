@@ -12,15 +12,18 @@ set(SOURCES
     src/main.cpp
     src/chat/Message.cpp
     src/chat/ChatController.cpp
+    src/chat/FileTransfer.cpp
     src/tnc/KissFrame.cpp
     src/tnc/KissTnc.cpp
     src/tnc/PortEnumerator.cpp
+    src/util/ProtocolLogger.cpp
     src/ui/MainWindow.cpp
     src/ui/ChannelList.cpp
     src/ui/MessageWidget.cpp
     src/ui/ChatView.cpp
     src/ui/InputBar.cpp
     src/ui/EmojiPicker.cpp
+    src/ui/FileTransferDialog.cpp
     src/ui/SettingsDialog.cpp
     src/ui/ActiveUsersPanel.cpp
 )
@@ -28,16 +31,19 @@ set(SOURCES
 set(HEADERS
     src/chat/Message.h
     src/chat/ChatController.h
+    src/chat/FileTransfer.h
     src/tnc/KissFrame.h
     src/tnc/ITnc.h
     src/tnc/KissTnc.h
     src/tnc/PortEnumerator.h
+    src/util/ProtocolLogger.h
     src/ui/MainWindow.h
     src/ui/ChannelList.h
     src/ui/MessageWidget.h
     src/ui/ChatView.h
     src/ui/InputBar.h
     src/ui/EmojiPicker.h
+    src/ui/FileTransferDialog.h
     src/ui/SettingsDialog.h
     src/ui/ActiveUsersPanel.h
 )

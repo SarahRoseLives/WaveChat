@@ -1,8 +1,10 @@
 #include "MessageWidget.h"
 #include <QHBoxLayout>
 #include <QVBoxLayout>
+#include <QProgressBar>
 #include <QFont>
 #include <QHash>
+#include <QFileInfo>
 
 static const QStringList s_discordColors = {
     "#5865f2", "#57f287", "#fee75c", "#eb459e",
@@ -60,7 +62,7 @@ MessageWidget::MessageWidget(const Message& msg, QWidget* parent)
 
     contentLayout->addLayout(headerRow);
 
-    // Message text
+    // Message body
     if (msg.type == Message::System) {
         m_avatar->setText("#");
         m_avatar->setStyleSheet(QString(
@@ -77,14 +79,60 @@ MessageWidget::MessageWidget(const Message& msg, QWidget* parent)
         m_textLabel->setObjectName("systemMessageText");
         m_textLabel->setWordWrap(true);
         m_textLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        contentLayout->addWidget(m_textLabel);
+    } else if (msg.type == Message::File) {
+        m_avatar->setText("\xF0\x9F\x93\x81");
+
+        // File name
+        auto* nameLabel = new QLabel(msg.file.fileName, this);
+        nameLabel->setStyleSheet("color: #dcddde; font-size: 13px; font-weight: bold; background: transparent;");
+        contentLayout->addWidget(nameLabel);
+
+        if (msg.file.state == FileTransferInfo::Transferring
+            || msg.file.state == FileTransferInfo::Offering) {
+            // Progress bar
+            m_progressBar = new QProgressBar(this);
+            m_progressBar->setObjectName("fileProgressBar");
+            m_progressBar->setMaximum(msg.file.totalChunks);
+            m_progressBar->setValue(msg.file.receivedChunks);
+            m_progressBar->setTextVisible(true);
+            m_progressBar->setStyleSheet(
+                "QProgressBar#fileProgressBar {"
+                "  background-color: #40444b; border: none; border-radius: 4px;"
+                "  height: 6px; text-align: center; color: #dcddde; font-size: 10px; }"
+                "QProgressBar#fileProgressBar::chunk {"
+                "  background-color: #5865f2; border-radius: 4px; }");
+            m_progressBar->setMaximumWidth(300);
+            contentLayout->addWidget(m_progressBar);
+
+            QString status = msg.file.state == FileTransferInfo::Offering
+                ? "Waiting for acceptance..."
+                : QString("%1 / %2 chunks").arg(msg.file.receivedChunks).arg(msg.file.totalChunks);
+            m_textLabel = new QLabel(status, this);
+            m_textLabel->setStyleSheet("color: #72767d; font-size: 11px; background: transparent;");
+            contentLayout->addWidget(m_textLabel);
+        } else if (msg.file.state == FileTransferInfo::Complete) {
+            m_textLabel = new QLabel(QString("\xE2\x9C\x85 Complete \xE2\x80\xA2 %1 KB")
+                                         .arg(msg.file.fileSize / 1024), this);
+            m_textLabel->setStyleSheet("color: #57f287; font-size: 12px; background: transparent;");
+            contentLayout->addWidget(m_textLabel);
+        } else if (msg.file.state == FileTransferInfo::Failed) {
+            m_textLabel = new QLabel("\xE2\x9D\x8C Transfer failed", this);
+            m_textLabel->setStyleSheet("color: #ed4245; font-size: 12px; background: transparent;");
+            contentLayout->addWidget(m_textLabel);
+        } else {
+            m_textLabel = new QLabel("\xE2\x9D\x8C Cancelled", this);
+            m_textLabel->setStyleSheet("color: #ed4245; font-size: 12px; background: transparent;");
+            contentLayout->addWidget(m_textLabel);
+        }
     } else {
         m_textLabel = new QLabel(msg.text, this);
         m_textLabel->setObjectName("messageText");
         m_textLabel->setWordWrap(true);
         m_textLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+        contentLayout->addWidget(m_textLabel);
     }
 
-    contentLayout->addWidget(m_textLabel);
     outerLayout->addLayout(contentLayout, 1);
 }
 

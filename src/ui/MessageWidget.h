@@ -1,6 +1,7 @@
 #pragma once
 #include <QWidget>
 #include <QLabel>
+#include <QProgressBar>
 #include "chat/Message.h"
 
 class MessageWidget : public QWidget {
@@ -13,6 +14,7 @@ private:
     QLabel* m_callsignLabel;
     QLabel* m_timestampLabel;
     QLabel* m_textLabel;
+    QProgressBar* m_progressBar = nullptr;
 
     static QString avatarColor(const QString& callsign);
 };

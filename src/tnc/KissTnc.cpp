@@ -1,5 +1,6 @@
 #include "KissTnc.h"
 #include "KissFrame.h"
+#include "util/ProtocolLogger.h"
 #include <QTimer>
 
 KissTnc::KissTnc(QObject* parent)
@@ -67,6 +68,7 @@ void KissTnc::sendFrame(const QByteArray& frame)
         return;
     m_serial->write(frame);
     m_serial->flush();
+    ProtocolLogger::log("TX KISS", QString("bytes=%1").arg(frame.size()) + " " + frame.toHex(' '));
 }
 
 void KissTnc::sendKissInit()
@@ -121,8 +123,10 @@ void KissTnc::onReadyRead()
         QByteArray frame = m_buffer.mid(start, end - start + 1);
         m_buffer.remove(0, end + 1);
 
-        if (frame.size() > 2)
+        if (frame.size() > 2) {
+            ProtocolLogger::log("RX KISS", QString("bytes=%1").arg(frame.size()) + " " + frame.toHex(' '));
             emit frameReceived(frame);
+        }
     }
 }
 

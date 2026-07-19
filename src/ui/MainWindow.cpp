@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 #include "SettingsDialog.h"
+#include "FileTransferDialog.h"
 #include "tnc/KissTnc.h"
 #include <QMenuBar>
 #include <QMenu>
@@ -13,11 +14,14 @@
 #include <QApplication>
 #include <QTimer>
 #include <QCloseEvent>
+#include <QFileInfo>
+#include <QDesktopServices>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
     , m_controller(new ChatController(this))
     , m_settings("WaveChat", "WaveChat")
+    , m_ftManager(new FileTransferManager(this))
 {
     setupUi();
     setupMenuBar();
@@ -25,12 +29,40 @@ MainWindow::MainWindow(QWidget* parent)
 
     connect(m_controller, &ChatController::messageReceived,
             this, &MainWindow::onMessageReceived);
+    connect(m_controller, &ChatController::rawFrameReceived,
+            this, [this](const QByteArray& info, const QString& from) {
+        m_ftManager->processIncomingFrame(QString::fromUtf8(info), from);
+        if (!from.isEmpty())
+            m_activeUsers->addUser(from);
+    });
     connect(m_controller, &ChatController::connected,
             this, &MainWindow::onConnected);
     connect(m_controller, &ChatController::disconnected,
             this, &MainWindow::onDisconnected);
     connect(m_controller, &ChatController::errorOccurred,
             this, &MainWindow::onError);
+
+    // File transfer signals
+    connect(m_ftManager, &FileTransferManager::sendRawFrame,
+            this, [this](const QByteArray& data) {
+        m_controller->sendRawMessage(QString::fromUtf8(data));
+    });
+    connect(m_ftManager, &FileTransferManager::fileOfferReceived,
+            this, &MainWindow::onFileOfferReceived);
+    connect(m_ftManager, &FileTransferManager::fileProgressUpdate,
+            this, &MainWindow::onFileProgressUpdate);
+    connect(m_ftManager, &FileTransferManager::fileSendProgress,
+            this, &MainWindow::onFileSendProgress);
+    connect(m_ftManager, &FileTransferManager::fileComplete,
+            this, &MainWindow::onFileComplete);
+    connect(m_ftManager, &FileTransferManager::fileSendComplete,
+            this, [this](const QString& fileId) {
+        Q_UNUSED(fileId);
+        if (m_sendDialog)
+            m_sendDialog->setComplete("");
+    });
+    connect(m_ftManager, &FileTransferManager::fileFailed,
+            this, &MainWindow::onFileFailed);
 
     loadSettings();
 }
@@ -89,6 +121,8 @@ void MainWindow::setupUi()
 
     connect(m_inputBar, &InputBar::messageSubmitted,
             this, &MainWindow::onSendMessage);
+    connect(m_inputBar, &InputBar::fileAttachRequested,
+            this, &MainWindow::onFileAttachRequested);
     connect(m_channelList, &ChannelList::channelSelected,
             this, &MainWindow::onChannelSelected);
 }
@@ -136,23 +170,21 @@ void MainWindow::onMessageReceived(const Message& msg)
     QString channel = msg.channel.isEmpty() ? "main" : msg.channel;
 
     ensureChannelExists(channel);
-
     m_channelMessages[channel].append(msg);
 
-    if (msg.type == Message::Text) {
+    if (msg.type == Message::Text || msg.type == Message::File) {
         m_channelList->touchChannel(channel);
     }
 
     if (channel == m_controller->currentChannel()) {
         m_chatView->appendMessage(msg);
     } else {
-        // Mark unread — only for incoming text messages, not system messages
         if (msg.type == Message::Text) {
             m_channelList->setChannelUnread(channel, true);
         }
     }
 
-    if (msg.type == Message::Text && !msg.callsign.isEmpty()) {
+    if ((msg.type == Message::Text || msg.type == Message::File) && !msg.callsign.isEmpty()) {
         m_activeUsers->addUser(msg.callsign);
     }
 }
@@ -166,36 +198,25 @@ void MainWindow::onChannelSelected(const QString& channel)
 {
     if (channel == m_controller->currentChannel())
         return;
-
     switchToChannel(channel);
 }
 
 void MainWindow::switchToChannel(const QString& channel)
 {
-    // Clear unread for the old channel
     QString oldChannel = m_controller->currentChannel();
-    if (!oldChannel.isEmpty()) {
+    if (!oldChannel.isEmpty())
         m_channelList->setChannelUnread(oldChannel, false);
-    }
 
     m_controller->setCurrentChannel(channel);
-
     m_chatView->clearMessages();
     m_channelHeader->setText(QString("# %1").arg(channel));
-
-    m_inputBar->setPlaceholder(
-        QString("Message #%1").arg(channel));
-
+    m_inputBar->setPlaceholder(QString("Message #%1").arg(channel));
     m_channelList->setActiveChannel(channel);
-
-    // Clear unread for this channel (we're viewing it now)
     m_channelList->setChannelUnread(channel, false);
 
-    // Replay stored messages for this channel
     if (m_channelMessages.contains(channel)) {
-        for (const auto& msg : m_channelMessages[channel]) {
+        for (const auto& msg : m_channelMessages[channel])
             m_chatView->appendMessage(msg);
-        }
     }
 }
 
@@ -214,15 +235,12 @@ void MainWindow::ensureChannelExists(const QString& channel)
 void MainWindow::onConnected()
 {
     m_inputBar->setEnabled(true);
-    statusBar()->showMessage(QString("Connected — %1")
-                                 .arg(m_controller->callsign()));
+    statusBar()->showMessage(QString("Connected — %1").arg(m_controller->callsign()));
     m_channelList->setConnectionStatus(true);
-
     m_activeUsers->clear();
     m_activeUsers->setLocalUser(m_controller->callsign());
     m_activeUsers->addUser(m_controller->callsign());
 
-    // Default to "main" channel
     if (!m_channelMessages.contains("main"))
         m_channelMessages["main"] = {};
     m_channelList->addChannel("main");
@@ -243,6 +261,133 @@ void MainWindow::onError(const QString& error)
 {
     statusBar()->showMessage(QString("Error: %1").arg(error));
     m_chatView->appendMessage(Message::systemMessage("Error: " + error));
+}
+
+// ============================================================================
+// File transfer
+// ============================================================================
+
+void MainWindow::onFileAttachRequested(const QString& filePath)
+{
+    QFileInfo fi(filePath);
+    qint64 size = fi.size();
+
+    // Sanity check — won't work over packet radio
+    const qint64 maxSize = 500 * 1024; // 500 KB
+    if (size > maxSize) {
+        QMessageBox::warning(this, "File too large",
+            QString("%1 is %2 KB.\n\n"
+                    "Files over 500 KB are impractical over packet radio.\n"
+                    "At 1200 baud this would take over an hour.")
+                .arg(fi.fileName()).arg(size / 1024));
+        return;
+    }
+
+    int totalChunks = (size + FileTransferManager::CHUNK_RAW_BYTES - 1)
+                      / FileTransferManager::CHUNK_RAW_BYTES;
+    if (totalChunks == 0) totalChunks = 1;
+
+    // Time estimate
+    double secs = totalChunks * 3.7;
+    QString timeStr;
+    if (secs < 60)
+        timeStr = QString("%1s").arg((int)secs);
+    else if (secs < 3600)
+        timeStr = QString("%1m %2s").arg((int)secs / 60).arg((int)secs % 60);
+    else
+        timeStr = QString("%1h %2m").arg((int)secs / 3600).arg(((int)secs % 3600) / 60);
+
+    auto* dlg = new FileTransferDialog(FileTransferDialog::PreSend, this);
+    dlg->setFileInfo(filePath, size, totalChunks, timeStr);
+
+    connect(dlg, &FileTransferDialog::accepted, this, [this, filePath, dlg]() {
+        dlg->deleteLater();
+
+        // Show send progress immediately — starts as "waiting for receiver"
+        m_sendDialog = new FileTransferDialog(FileTransferDialog::SendProgress, this);
+        QFileInfo fi(filePath);
+        int chunks = (fi.size() + FileTransferManager::CHUNK_RAW_BYTES - 1)
+                     / FileTransferManager::CHUNK_RAW_BYTES;
+        if (chunks == 0) chunks = 1;
+        double secs = chunks * 0.2 + 12.0;
+        QString ts = secs < 60 ? QString("%1s").arg((int)secs)
+                     : QString("%1m %2s").arg((int)secs / 60).arg((int)secs % 60);
+        m_sendDialog->setFileInfo(filePath, fi.size(), chunks, ts);
+
+        connect(m_sendDialog, &FileTransferDialog::cancelled, this, [this]() {
+            m_ftManager->cancelSend();
+        });
+
+        m_sendDialog->show();
+        m_ftManager->startSend(filePath);
+    });
+
+    connect(dlg, &FileTransferDialog::cancelled, dlg, &QObject::deleteLater);
+    dlg->show();
+}
+
+void MainWindow::onFileOfferReceived(const FileTransferInfo& info)
+{
+    auto* dlg = new FileTransferDialog(FileTransferDialog::ReceiveOffer, this);
+    dlg->setFileInfo(info.fileName, info.fileSize, info.totalChunks, "");
+
+    connect(dlg, &FileTransferDialog::accepted, this, [this, info, dlg]() {
+        dlg->deleteLater();
+        m_ftManager->acceptReceive(info.fileId);
+
+        // Show receive progress
+        m_recvDialog = new FileTransferDialog(FileTransferDialog::ReceiveProgress, this);
+        m_recvDialog->setFileInfo(info.fileName, info.fileSize, info.totalChunks, "");
+        m_recvDialog->show();
+    });
+
+    connect(dlg, &FileTransferDialog::cancelled, this, [this, info, dlg]() {
+        dlg->deleteLater();
+        m_ftManager->rejectReceive(info.fileId);
+    });
+
+    dlg->show();
+
+    // Also show in chat
+    FileTransferInfo fiCopy = info;
+    fiCopy.state = FileTransferInfo::Offering;
+    Message msg;
+    msg.callsign = info.fromCallsign;
+    msg.type = Message::File;
+    msg.file = fiCopy;
+    msg.timestamp = QDateTime::currentDateTime();
+    onMessageReceived(msg);
+}
+
+void MainWindow::onFileProgressUpdate(const QString& fileId, int done, int total)
+{
+    Q_UNUSED(fileId);
+    if (m_recvDialog)
+        m_recvDialog->setProgress(done, total);
+}
+
+void MainWindow::onFileSendProgress(int done, int total)
+{
+    if (m_sendDialog)
+        m_sendDialog->setProgress(done, total);
+}
+
+void MainWindow::onFileComplete(const FileTransferInfo& info)
+{
+    if (m_recvDialog) {
+        m_recvDialog->setComplete(info.savePath);
+        connect(m_recvDialog, &FileTransferDialog::accepted, this, [info]() {
+            QDesktopServices::openUrl(QUrl::fromLocalFile(
+                QFileInfo(info.savePath).absolutePath()));
+        });
+    }
+}
+
+void MainWindow::onFileFailed(const QString& fileId, const QString& reason)
+{
+    Q_UNUSED(fileId);
+    statusBar()->showMessage(QString("File transfer: %1").arg(reason), 5000);
+    m_chatView->appendMessage(Message::systemMessage("File transfer: " + reason));
 }
 
 // ============================================================================
@@ -310,8 +455,7 @@ void MainWindow::createTnc()
     kiss->setBaudRate(m_settings.value("tnc/baudrate", 9600).toInt());
 
     int fcIdx = m_settings.value("tnc/flowcontrol", 1).toInt();
-    QSerialPort::FlowControl fc = static_cast<QSerialPort::FlowControl>(
-        qBound(0, fcIdx, 2));
+    QSerialPort::FlowControl fc = static_cast<QSerialPort::FlowControl>(qBound(0, fcIdx, 2));
     kiss->setFlowControl(fc);
 
     int txDelay = m_settings.value("tnc/txdelay", 300).toInt();

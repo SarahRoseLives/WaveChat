@@ -16,16 +16,19 @@ public:
 
 signals:
     void messageSubmitted(const QString& text);
+    void fileAttachRequested(const QString& filePath);
 
 private slots:
     void onSendClicked();
     void onEmojiClicked();
     void onEmojiSelected(const QString& emoji);
+    void onAttachClicked();
 
 private:
     QTextEdit* m_edit;
     QPushButton* m_sendButton;
     QPushButton* m_emojiButton;
+    QPushButton* m_attachButton;
     EmojiPicker* m_emojiPicker = nullptr;
 
     bool eventFilter(QObject* obj, QEvent* event) override;

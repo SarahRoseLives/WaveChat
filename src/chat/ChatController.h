@@ -24,9 +24,11 @@ public slots:
     void connectTnc();
     void disconnectTnc();
     void sendMessage(const QString& text);
+    void sendRawMessage(const QString& text);
 
 signals:
     void messageReceived(const Message& message);
+    void rawFrameReceived(const QByteArray& infoField, const QString& fromCallsign);
     void connected();
     void disconnected();
     void errorOccurred(const QString& error);
