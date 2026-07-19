@@ -16,14 +16,28 @@
 
 QByteArray ChatController::encodeAx25Address(const QString& callsign, int ssid, bool isLast)
 {
+    QString baseCall = callsign.toUpper();
+    int effectiveSsid = ssid;
+
+    // Parse SSID from callsign like "AD8NT-1" → base "AD8NT", ssid 1
+    int dashIdx = baseCall.lastIndexOf('-');
+    if (dashIdx >= 0 && dashIdx < baseCall.length() - 1) {
+        bool ok = false;
+        int parsed = baseCall.mid(dashIdx + 1).toInt(&ok);
+        if (ok && parsed >= 0 && parsed <= 15) {
+            effectiveSsid = parsed;
+            baseCall = baseCall.left(dashIdx);
+        }
+    }
+
     QByteArray addr(7, '\0');
-    QString cs = callsign.toUpper().leftJustified(6, ' ').left(6);
+    QString cs = baseCall.leftJustified(6, ' ').left(6);
 
     for (int i = 0; i < 6; ++i) {
         addr[i] = static_cast<char>(static_cast<uint8_t>(cs[i].toLatin1()) << 1);
     }
 
-    uint8_t lastByte = static_cast<uint8_t>((ssid & 0x0F) << 1) | 0x60;
+    uint8_t lastByte = static_cast<uint8_t>((effectiveSsid & 0x0F) << 1) | 0x60;
     if (isLast)
         lastByte |= 0x01;
 

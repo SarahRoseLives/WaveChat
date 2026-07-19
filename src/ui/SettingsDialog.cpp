@@ -33,10 +33,6 @@ SettingsDialog::SettingsDialog(QWidget* parent)
     m_callsignEdit->setFont(callsignFont);
     stationLayout->addRow("Callsign:", m_callsignEdit);
 
-    m_frequencyEdit = new QLineEdit(stationTab);
-    m_frequencyEdit->setPlaceholderText("e.g. 144.390 MHz");
-    stationLayout->addRow("Frequency:", m_frequencyEdit);
-
     tabs->addTab(stationTab, "Station");
 
     // === TNC tab ===
@@ -106,7 +102,6 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 }
 
 QString SettingsDialog::callsign() const { return m_callsignEdit->text().trimmed().toUpper(); }
-QString SettingsDialog::frequency() const { return m_frequencyEdit->text().trimmed(); }
 QString SettingsDialog::serialPort() const { return m_portCombo->currentData().toString(); }
 int SettingsDialog::baudRate() const { return m_baudCombo->currentText().toInt(); }
 int SettingsDialog::flowControlIndex() const { return m_flowCombo->currentData().toInt(); }
@@ -143,9 +138,6 @@ void SettingsDialog::loadSettings()
     QString savedCallsign = m_settings.value("station/callsign", "").toString();
     m_callsignEdit->setText(savedCallsign);
 
-    QString savedFreq = m_settings.value("station/frequency", "144.390 MHz").toString();
-    m_frequencyEdit->setText(savedFreq);
-
     QString savedPort = m_settings.value("tnc/port", "").toString();
     if (!savedPort.isEmpty()) {
         for (int i = 0; i < m_portCombo->count(); ++i) {
@@ -175,7 +167,6 @@ void SettingsDialog::loadSettings()
 void SettingsDialog::saveSettings()
 {
     m_settings.setValue("station/callsign", callsign());
-    m_settings.setValue("station/frequency", frequency());
     m_settings.setValue("tnc/port", serialPort());
     m_settings.setValue("tnc/baudrate", baudRate());
     m_settings.setValue("tnc/flowcontrol", flowControlIndex());

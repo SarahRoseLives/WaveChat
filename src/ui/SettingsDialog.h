@@ -11,7 +11,6 @@ public:
     explicit SettingsDialog(QWidget* parent = nullptr);
 
     QString callsign() const;
-    QString frequency() const;
     QString serialPort() const;
     int baudRate() const;
     int flowControlIndex() const;
@@ -23,7 +22,6 @@ private slots:
 
 private:
     QLineEdit* m_callsignEdit;
-    QLineEdit* m_frequencyEdit;
     QComboBox* m_portCombo;
     QComboBox* m_baudCombo;
     QComboBox* m_flowCombo;

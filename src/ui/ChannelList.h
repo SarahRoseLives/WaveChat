@@ -8,7 +8,6 @@ public:
     explicit ChannelList(QWidget* parent = nullptr);
 
     void setChannelName(const QString& name);
-    void setChannelFrequency(const QString& freq);
     void setConnectionStatus(bool connected);
 
 signals:
@@ -16,5 +15,4 @@ signals:
 
 private:
     QString m_channelName;
-    QString m_frequency;
 };

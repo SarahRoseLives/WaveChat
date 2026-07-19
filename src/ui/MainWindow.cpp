@@ -178,7 +178,6 @@ void MainWindow::openSettings()
         m_chatView->clearMessages();
 
         m_controller->setCallsign(dialog.callsign());
-        m_controller->setFrequency(dialog.frequency());
 
         m_settings.setValue("tnc/port", dialog.serialPort());
         m_settings.setValue("tnc/baudrate", dialog.baudRate());
@@ -186,16 +185,14 @@ void MainWindow::openSettings()
         m_settings.setValue("tnc/txdelay", dialog.txDelay());
 
         m_channelList->setChannelName(m_controller->callsign());
-        m_channelList->setChannelFrequency(m_controller->frequency());
-        m_channelHeader->setText(QString("# %1 — %2")
-                                     .arg(m_controller->callsign(),
-                                          m_controller->frequency()));
+        m_channelHeader->setText(QString("# %1")
+                                     .arg(m_controller->callsign()));
 
         createTnc();
 
         m_chatView->appendMessage(Message::systemMessage(
-            QString("Channel #%1 — %2. Settings saved.")
-                .arg(m_controller->callsign(), m_controller->frequency())));
+            QString("Channel #%1 — Settings saved.")
+                .arg(m_controller->callsign())));
 
         if (dialog.callsign().isEmpty()) {
             m_chatView->appendMessage(Message::systemMessage(
@@ -211,16 +208,12 @@ void MainWindow::openSettings()
 void MainWindow::loadSettings()
 {
     QString callsign = m_settings.value("station/callsign", "").toString();
-    QString frequency = m_settings.value("station/frequency", "144.390 MHz").toString();
 
     m_controller->setCallsign(callsign);
-    m_controller->setFrequency(frequency);
 
     m_channelList->setChannelName(callsign.isEmpty() ? "Set callsign..." : callsign);
-    m_channelList->setChannelFrequency(frequency);
-    m_channelHeader->setText(QString("# %1 — %2")
-                                 .arg(callsign.isEmpty() ? "Set callsign..." : callsign,
-                                      frequency));
+    m_channelHeader->setText(QString("# %1")
+                                 .arg(callsign.isEmpty() ? "Set callsign..." : callsign));
 
     createTnc();
 
