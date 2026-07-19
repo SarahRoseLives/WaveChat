@@ -20,6 +20,7 @@ set(SOURCES
     src/ui/MessageWidget.cpp
     src/ui/ChatView.cpp
     src/ui/InputBar.cpp
+    src/ui/EmojiPicker.cpp
     src/ui/SettingsDialog.cpp
     src/ui/ActiveUsersPanel.cpp
 )
@@ -36,6 +37,7 @@ set(HEADERS
     src/ui/MessageWidget.h
     src/ui/ChatView.h
     src/ui/InputBar.h
+    src/ui/EmojiPicker.h
     src/ui/SettingsDialog.h
     src/ui/ActiveUsersPanel.h
 )

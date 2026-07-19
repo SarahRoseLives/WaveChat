@@ -3,6 +3,8 @@
 #include <QTextEdit>
 #include <QPushButton>
 
+class EmojiPicker;
+
 class InputBar : public QWidget {
     Q_OBJECT
 public:
@@ -17,12 +19,14 @@ signals:
 
 private slots:
     void onSendClicked();
-    void onAttachClicked();
+    void onEmojiClicked();
+    void onEmojiSelected(const QString& emoji);
 
 private:
     QTextEdit* m_edit;
     QPushButton* m_sendButton;
-    QPushButton* m_attachButton;
+    QPushButton* m_emojiButton;
+    EmojiPicker* m_emojiPicker = nullptr;
 
     bool eventFilter(QObject* obj, QEvent* event) override;
 };
