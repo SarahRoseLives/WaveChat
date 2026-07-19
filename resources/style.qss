@@ -9,6 +9,20 @@ QWidget#centralWidget {
 }
 
 /* ---- Sidebar ---- */
+QWidget#channelListPanel {
+    background-color: #2f3136;
+}
+
+QLabel#channelListHeader {
+    background-color: #2f3136;
+    color: #8e9297;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 16px 12px 4px 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
 QListWidget#channelList {
     background-color: #2f3136;
     color: #8e9297;
@@ -19,7 +33,7 @@ QListWidget#channelList {
 }
 
 QListWidget#channelList::item {
-    padding: 8px 12px;
+    padding: 0px 12px;
     border-radius: 4px;
     margin: 1px 0;
 }
@@ -32,6 +46,37 @@ QListWidget#channelList::item:selected {
 QListWidget#channelList::item:hover:!selected {
     background-color: #34373c;
     color: #dcddde;
+}
+
+QWidget#newChannelRow {
+    background-color: #2f3136;
+    padding: 0 8px 8px 8px;
+}
+
+QWidget#newChannelRow QLineEdit {
+    background-color: #202225;
+    color: #dcddde;
+    border: 1px solid #202225;
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
+
+QWidget#newChannelRow QLineEdit:focus {
+    border-color: #5865f2;
+}
+
+QWidget#newChannelRow QPushButton {
+    background-color: #4f545c;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+QWidget#newChannelRow QPushButton:hover {
+    background-color: #5865f2;
 }
 
 /* ---- Chat area ---- */
@@ -370,7 +415,7 @@ QListWidget#activeUsersList {
 }
 
 QListWidget#activeUsersList::item {
-    padding: 6px 10px;
+    padding: 0px 10px;
     border-radius: 4px;
     margin: 1px 0;
 }

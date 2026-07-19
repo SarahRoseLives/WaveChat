@@ -4,14 +4,6 @@
 
 // ============================================================================
 // AX.25 address encoding (7 bytes per address)
-//
-// Bytes 0-5: callsign char << 1 (ASCII, space-padded to 6 chars)
-// Byte 6:    bits 0   = 1 if last address, 0 if more follow
-//            bits 1-4 = SSID (0-15)
-//            bit 5    = reserved (0)
-//            bit 6    = reserved (1)
-//            bit 7    = C/R (0 = command)
-//            Typically: (ssid << 1) | 0x60 | (isLast ? 0x01 : 0x00)
 // ============================================================================
 
 QByteArray ChatController::encodeAx25Address(const QString& callsign, int ssid, bool isLast)
@@ -19,7 +11,6 @@ QByteArray ChatController::encodeAx25Address(const QString& callsign, int ssid, 
     QString baseCall = callsign.toUpper();
     int effectiveSsid = ssid;
 
-    // Parse SSID from callsign like "AD8NT-1" → base "AD8NT", ssid 1
     int dashIdx = baseCall.lastIndexOf('-');
     if (dashIdx >= 0 && dashIdx < baseCall.length() - 1) {
         bool ok = false;
@@ -71,29 +62,45 @@ QPair<QString, int> ChatController::decodeAx25Address(const QByteArray& data, in
 
 QPair<QString, QString> ChatController::parseAx25UiFrame(const QByteArray& ax25)
 {
-    // Minimum AX.25 UI frame: dest(7) + src(7) + ctrl(1) + pid(1) = 16
     if (ax25.size() < 16)
         return {};
 
     uint8_t ctrl = static_cast<uint8_t>(ax25[14]);
     uint8_t pid  = static_cast<uint8_t>(ax25[15]);
 
-    // Accept UI frames (0x03) and unnumbered info (0x13 = UI + P/F bit)
     if (ctrl != 0x03 && ctrl != 0x13)
         return {};
 
-    // Accept no-layer-3 (0xF0) and some common PIDs
     if (pid != 0xF0 && pid != 0xCF && pid != 0xCD)
         return {};
 
     auto [srcCallsign, srcSsid] = decodeAx25Address(ax25, 7);
 
     QString info;
-    if (ax25.size() > 16) {
+    if (ax25.size() > 16)
         info = QString::fromUtf8(ax25.mid(16));
-    }
 
     return {srcCallsign, info};
+}
+
+// ============================================================================
+// Channel-aware text format:  "#channelName message text" or plain text → "main"
+// ============================================================================
+
+QPair<QString, QString> ChatController::parseChannelFromText(const QString& info)
+{
+    if (info.startsWith('#') && info.length() > 1) {
+        int spaceIdx = info.indexOf(' ');
+        if (spaceIdx > 1) {
+            QString ch = info.mid(1, spaceIdx - 1);
+            QString msg = info.mid(spaceIdx + 1);
+            return {ch, msg};
+        } else {
+            // "#channel" with no message text
+            return {info.mid(1), QString()};
+        }
+    }
+    return {"main", info};
 }
 
 // ============================================================================
@@ -123,6 +130,8 @@ void ChatController::setTnc(ITnc* tnc)
 ITnc* ChatController::tnc() const { return m_tnc; }
 void ChatController::setCallsign(const QString& callsign) { m_callsign = callsign; }
 QString ChatController::callsign() const { return m_callsign; }
+void ChatController::setCurrentChannel(const QString& channel) { m_currentChannel = channel; }
+QString ChatController::currentChannel() const { return m_currentChannel; }
 
 bool ChatController::isConnected() const
 {
@@ -152,6 +161,7 @@ void ChatController::sendMessage(const QString& text)
     Message localEcho;
     localEcho.callsign = m_callsign;
     localEcho.text = text.trimmed();
+    localEcho.channel = m_currentChannel;
     localEcho.timestamp = QDateTime::currentDateTime();
     localEcho.type = Message::Text;
     emit messageReceived(localEcho);
@@ -163,13 +173,16 @@ void ChatController::onFrameReceived(const QByteArray& wireFrame)
     if (command != KissFrame::CMD_DATA || data.isEmpty())
         return;
 
-    auto [callsign, text] = parseAx25UiFrame(data);
+    auto [callsign, info] = parseAx25UiFrame(data);
     if (callsign.isEmpty())
         return;
+
+    auto [channel, text] = parseChannelFromText(info);
 
     Message msg;
     msg.callsign = callsign;
     msg.text = text;
+    msg.channel = channel;
     msg.timestamp = QDateTime::currentDateTime();
     msg.type = Message::Text;
 
@@ -178,13 +191,15 @@ void ChatController::onFrameReceived(const QByteArray& wireFrame)
 
 QByteArray ChatController::buildFrame(const QString& text) const
 {
-    // AX.25 UI frame: dest + src + control + pid + info
+    // Prepend channel tag: "#channelName message text"
+    QString payload = QString("#%1 %2").arg(m_currentChannel, text);
+
     QByteArray ax25;
-    ax25.append(encodeAx25Address("CQ",      0, false)); // destination
-    ax25.append(encodeAx25Address(m_callsign, 0, true));  // source (last)
-    ax25.append(static_cast<char>(0x03));                    // UI frame
-    ax25.append(static_cast<char>(0xF0));                    // no layer 3
-    ax25.append(text.toUtf8());                              // payload
+    ax25.append(encodeAx25Address("CQ",      0, false));
+    ax25.append(encodeAx25Address(m_callsign, 0, true));
+    ax25.append(static_cast<char>(0x03));
+    ax25.append(static_cast<char>(0xF0));
+    ax25.append(payload.toUtf8());
 
     return KissFrame::encode(KissFrame::CMD_DATA, ax25);
 }

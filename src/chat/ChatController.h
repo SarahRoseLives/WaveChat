@@ -15,6 +15,9 @@ public:
     void setCallsign(const QString& callsign);
     QString callsign() const;
 
+    void setCurrentChannel(const QString& channel);
+    QString currentChannel() const;
+
     bool isConnected() const;
 
 public slots:
@@ -34,10 +37,12 @@ private slots:
 private:
     ITnc* m_tnc = nullptr;
     QString m_callsign;
+    QString m_currentChannel = "main";
 
     QByteArray buildFrame(const QString& text) const;
 
     static QByteArray encodeAx25Address(const QString& callsign, int ssid, bool isLast);
     static QPair<QString, int> decodeAx25Address(const QByteArray& data, int offset);
     static QPair<QString, QString> parseAx25UiFrame(const QByteArray& ax25);
+    static QPair<QString, QString> parseChannelFromText(const QString& info);
 };

@@ -7,6 +7,7 @@ struct Message {
 
     QString callsign;
     QString text;
+    QString channel;
     QDateTime timestamp;
     Type type = Text;
 

@@ -1,6 +1,8 @@
 #pragma once
 #include <QMainWindow>
 #include <QSettings>
+#include <QMap>
+#include <QList>
 #include "chat/ChatController.h"
 #include "ui/ChannelList.h"
 #include "ui/ChatView.h"
@@ -21,6 +23,7 @@ private slots:
     void onConnected();
     void onDisconnected();
     void onError(const QString& error);
+    void onChannelSelected(const QString& channel);
     void openSettings();
 
 private:
@@ -32,9 +35,13 @@ private:
     QLabel* m_channelHeader;
     QSettings m_settings;
 
+    QMap<QString, QList<Message>> m_channelMessages;
+
     void setupUi();
     void setupMenuBar();
     void setupStatusBar();
     void loadSettings();
     void createTnc();
+    void switchToChannel(const QString& channel);
+    void ensureChannelExists(const QString& channel);
 };

@@ -6,6 +6,12 @@
 #include <QDateTime>
 #include <QString>
 
+struct UserEntry {
+    QListWidgetItem* item = nullptr;
+    QWidget* widget = nullptr;
+    QLabel* timeLabel = nullptr;
+};
+
 class ActiveUsersPanel : public QWidget {
     Q_OBJECT
 public:
@@ -20,9 +26,10 @@ private:
     QLabel* m_header;
     QListWidget* m_userList;
     QString m_localUser;
-    QMap<QString, QListWidgetItem*> m_items;
+    QMap<QString, UserEntry> m_items;
 
     void updateHeader();
-    QListWidgetItem* createUserItem(const QString& callsign, bool isLocal);
+    void updateTimestamps();
+    static QString formatTime(const QDateTime& dt);
     static QString avatarColor(const QString& callsign);
 };
