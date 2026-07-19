@@ -12,6 +12,7 @@ public:
     void updateFileProgress(int received, int total);
     void updateFileComplete(qint64 fileSize);
     void updateFileFailed();
+    void showImage(const QString& path);
 
 private:
     QLabel* m_avatar;
@@ -19,6 +20,8 @@ private:
     QLabel* m_timestampLabel;
     QLabel* m_textLabel;
     QProgressBar* m_progressBar = nullptr;
+    QLabel* m_imageLabel = nullptr;
 
     static QString avatarColor(const QString& callsign);
+    static bool isImageFile(const QString& name);
 };

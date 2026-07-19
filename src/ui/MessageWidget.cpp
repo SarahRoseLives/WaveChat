@@ -5,6 +5,7 @@
 #include <QFont>
 #include <QHash>
 #include <QFileInfo>
+#include <QPixmap>
 
 static const QStringList s_discordColors = {
     "#5865f2", "#57f287", "#fee75c", "#eb459e",
@@ -88,6 +89,16 @@ MessageWidget::MessageWidget(const Message& msg, QWidget* parent)
         nameLabel->setStyleSheet("color: #dcddde; font-size: 13px; font-weight: bold; background: transparent;");
         contentLayout->addWidget(nameLabel);
 
+        // Image placeholder — filled on completion
+        if (isImageFile(msg.file.fileName)) {
+            m_imageLabel = new QLabel(this);
+            m_imageLabel->setStyleSheet("background: transparent; border: 1px solid #40444b; border-radius: 4px;");
+            m_imageLabel->setMaximumWidth(260);
+            m_imageLabel->setAlignment(Qt::AlignCenter);
+            m_imageLabel->hide();
+            contentLayout->addWidget(m_imageLabel);
+        }
+
         if (msg.file.state == FileTransferInfo::Transferring
             || msg.file.state == FileTransferInfo::Offering) {
             // Progress bar
@@ -144,6 +155,13 @@ QString MessageWidget::avatarColor(const QString& callsign)
     return s_discordColors[hash % s_discordColors.size()];
 }
 
+bool MessageWidget::isImageFile(const QString& name)
+{
+    QString ext = QFileInfo(name).suffix().toLower();
+    return ext == "png" || ext == "jpg" || ext == "jpeg"
+        || ext == "gif" || ext == "bmp" || ext == "webp";
+}
+
 void MessageWidget::updateFileProgress(int received, int total)
 {
     if (m_progressBar) {
@@ -176,4 +194,21 @@ void MessageWidget::updateFileFailed()
         m_textLabel->setText("\xE2\x9D\x8C Transfer failed");
         m_textLabel->setStyleSheet("color: #ed4245; font-size: 12px; background: transparent;");
     }
+}
+
+void MessageWidget::showImage(const QString& path)
+{
+    if (!m_imageLabel || path.isEmpty())
+        return;
+
+    QPixmap pix(path);
+    if (pix.isNull())
+        return;
+
+    QPixmap scaled = pix.scaledToWidth(260, Qt::SmoothTransformation);
+    m_imageLabel->setPixmap(scaled);
+    m_imageLabel->setFixedSize(scaled.size());
+    m_imageLabel->show();
+    m_imageLabel->setCursor(Qt::PointingHandCursor);
+    m_imageLabel->setToolTip("Click to open");
 }

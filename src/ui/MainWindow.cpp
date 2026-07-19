@@ -429,8 +429,11 @@ void MainWindow::onFileComplete(const FileTransferInfo& info)
     }
 
     auto it = m_fileWidgets.find(info.fileId);
-    if (it != m_fileWidgets.end() && it.value())
+    if (it != m_fileWidgets.end() && it.value()) {
         it.value()->updateFileComplete(info.fileSize);
+        if (!info.savePath.isEmpty())
+            it.value()->showImage(info.savePath);
+    }
 }
 
 void MainWindow::onFileFailed(const QString& fileId, const QString& reason)
